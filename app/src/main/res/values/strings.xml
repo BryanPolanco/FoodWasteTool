@@ -19,4 +19,11 @@
     <string name="logout">Logout</string>
     <string name="send_link">Send Link</string>
     <string name="go_back">Go Back</string>
+    <string name="hello">Hello.</string>
+    <string name="like_to_do">What would you like to do?</string>
+    <string name="open_camera">Open Camera</string>
+    <string name="view_data">View Data</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="collect_data">Collect Data</string>
+    <string name="gallery">Gallery</string>
 </resources>
