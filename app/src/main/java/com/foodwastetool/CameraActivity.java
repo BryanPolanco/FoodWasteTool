@@ -2,17 +2,22 @@ package com.foodwastetool;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentProvider;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.webkit.MimeTypeMap;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -22,18 +27,45 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.auth.User;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.OnProgressListener;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.StorageTask;
+import com.google.firebase.storage.UploadTask;
+import com.google.firestore.admin.v1beta1.Progress;
+
 import java.io.File;
 import java.io.IOException;
+import java.sql.DatabaseMetaData;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CameraActivity extends AppCompatActivity {
     public static final int CAMERA_PERM_CODE = 1;
     public static final int CAMERA_REQUEST_CODE = 2;
     public static final int GALLERY_REQUEST_CODE = 5;
+    public static final int PICK_IMAGE_REQUEST = 3;
+    public static final String TAG = "TAG";
     String currentPhotoPath;
     ImageView selectedImage;
-    Button  cameraButton, galleryButton;
+    Button  cameraButton, galleryButton, uploadButton;
+    String userID;
+
+    Uri mImageUri;
+    StorageReference  mStorageRef;
+    FirebaseFirestore mFirestoreRef;
+    FirebaseAuth fireAuth;
+    ProgressBar mProgressBar;
+    StorageTask mUploadTask;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,6 +74,11 @@ public class CameraActivity extends AppCompatActivity {
         selectedImage = findViewById(R.id.imageView);
         cameraButton = findViewById(R.id.OpenCameraButton);
         galleryButton = findViewById(R.id.galleryButton);
+        uploadButton = findViewById(R.id.uploadButton);
+        mProgressBar = findViewById(R.id.progressBar4);
+        mStorageRef = FirebaseStorage.getInstance().getReference("uploads");
+        mFirestoreRef = FirebaseFirestore.getInstance();
+        fireAuth = FirebaseAuth.getInstance();
         
         cameraButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -52,10 +89,69 @@ public class CameraActivity extends AppCompatActivity {
         galleryButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(CameraActivity.this, "Gallery is clicked", Toast.LENGTH_SHORT).show();
+                openFileChooser();
+            }
+        });
+        uploadButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(mUploadTask != null && mUploadTask.isInProgress()){
+                    Toast.makeText(CameraActivity.this, "Upload in progress", Toast.LENGTH_SHORT).show();
+                } else {
+                    uploadFile();
+                }
             }
         });
 
+    }
+    private String getFileExxtension(Uri uri) { //only to get image extension from file
+        ContentResolver cR = getContentResolver();
+        MimeTypeMap mime = MimeTypeMap.getSingleton();
+        return mime.getExtensionFromMimeType(cR.getType(uri));
+    }
+    private void uploadFile(){
+        if (mImageUri != null) {
+            StorageReference fileReference = mStorageRef.child(System.currentTimeMillis() +"." + getFileExxtension(mImageUri));
+            mUploadTask = fileReference.putFile(mImageUri)
+                    .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                            Handler handler = new Handler();
+                            handler.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    mProgressBar.setProgress(0);
+                                }
+                            }, 500);
+                            Toast.makeText(CameraActivity.this, "Upload Succesful", Toast.LENGTH_SHORT).show();
+                            Upload upload = new Upload (taskSnapshot.getUploadSessionUri().toString());
+                           mFirestoreRef.collection("Pictures").add(upload);
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Toast.makeText(CameraActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
+                            double progress = (100.0*taskSnapshot.getBytesTransferred() / taskSnapshot.getTotalByteCount());
+                            mProgressBar.setProgress((int) progress);
+                        }
+                    });
+        } else {
+            Toast.makeText(this, "no file selected", Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+    private void openFileChooser() {
+        Intent intent = new Intent();
+        intent.setType("image/*");
+        intent.setAction(Intent.ACTION_GET_CONTENT);
+        startActivityForResult(intent, PICK_IMAGE_REQUEST );
     }
 
     private void askCameraPermissions() {
@@ -83,6 +179,10 @@ public class CameraActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null ) {
+            mImageUri = data.getData();
+            selectedImage.setImageURI(mImageUri);
+        }
         if(requestCode == CAMERA_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK) {
                 File f = new File(currentPhotoPath);
@@ -104,7 +204,7 @@ public class CameraActivity extends AppCompatActivity {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String imageFileName = "JPEG_" + timeStamp + "_";
         //File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         File image = File.createTempFile(
                 imageFileName,  /* prefix */
                 ".jpg",         /* suffix */

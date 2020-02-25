@@ -26,4 +26,5 @@
     <string name="edit_profile">Edit Profile</string>
     <string name="collect_data">Collect Data</string>
     <string name="gallery">Gallery</string>
+    <string name="upload">Upload</string>
 </resources>

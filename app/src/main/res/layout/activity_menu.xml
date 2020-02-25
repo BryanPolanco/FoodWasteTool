@@ -29,9 +29,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_below="@+id/textView4"
-        android:fontFamily="monospace"
         android:layout_centerHorizontal="true"
+        android:fontFamily="monospace"
         android:text="@string/like_to_do"
+        android:textAlignment="center"
         android:textColor="#ffffff"
         android:textSize="21sp"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -46,15 +47,16 @@
         android:layout_height="40dp"
         android:layout_centerHorizontal="true"
         android:layout_centerVertical="true"
-        android:layout_marginTop="88dp"
         android:background="@drawable/rounded_button"
         android:elevation="0dp"
         android:text="@string/collect_data"
         android:textSize="18sp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.496"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView5" />
+        app:layout_constraintTop_toBottomOf="@+id/textView5"
+        app:layout_constraintVertical_bias="0.181" />
 
     <Button
         android:id="@+id/ViewDataButton"
