@@ -27,4 +27,17 @@
     <string name="collect_data">Collect Data</string>
     <string name="gallery">Gallery</string>
     <string name="upload">Upload</string>
+    <string name="change_name">Change Name</string>
+    <string name="change_email">Change Email</string>
+    <string name="change_buff_id">Change Buff ID</string>
+    <string name="change_password">Change Password</string>
+    <string name="your_name">Name</string>
+    <string name="your_profile">Your Profile</string>
+    <string name="update_name">Update Name</string>
+    <string name="enter_new_name">Please enter your new name.</string>
+    <string name="update">Update</string>
+    <string name="update_id">Update Buff ID</string>
+    <string name="enter_new_id">Please enter a new Buff ID</string>
+    <string name="update_email">Update Email</string>
+    <string name="enter_new_email">Please enter your new email.</string>
 </resources>

@@ -18,7 +18,7 @@ import com.google.firebase.auth.FirebaseAuth;
 
 public class ForgotPassActivity extends AppCompatActivity {
     EditText mEmail;
-    Button mSendLinkButton, mGoBackButton;
+    Button mSendLinkButton;
     FirebaseAuth fireAuth;
     ProgressBar mProgressBar;
 
@@ -28,18 +28,11 @@ public class ForgotPassActivity extends AppCompatActivity {
         setContentView(R.layout.activity_forgot_pass);
         mEmail = findViewById(R.id.email);
         mSendLinkButton = findViewById(R.id.sendLinkButton);
-        mGoBackButton = findViewById(R.id.goBackButton);
         fireAuth = FirebaseAuth.getInstance();
         mProgressBar = findViewById(R.id.progressBar3);
 
         mProgressBar.setVisibility(View.INVISIBLE);
 
-        mGoBackButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(getApplicationContext(), LoginActivity.class));
-            }
-        });
         mSendLinkButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
