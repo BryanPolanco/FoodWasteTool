@@ -29,6 +29,7 @@ import androidx.core.content.FileProvider;
 
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -124,7 +125,12 @@ public class CameraActivity extends AppCompatActivity {
                                 }
                             }, 500);
                             Toast.makeText(CameraActivity.this, "Upload Succesful", Toast.LENGTH_SHORT).show();
-                            Upload upload = new Upload (taskSnapshot.getUploadSessionUri().toString());
+
+                            Task<Uri> urlTask = taskSnapshot.getStorage().getDownloadUrl();
+                            while (!urlTask.isSuccessful());
+                            Uri downloadUrl = urlTask.getResult();
+
+                            Upload upload = new Upload (downloadUrl.toString());
                            mFirestoreRef.collection("Pictures").add(upload);
                         }
                     })
@@ -187,6 +193,8 @@ public class CameraActivity extends AppCompatActivity {
             if (resultCode == Activity.RESULT_OK) {
                 File f = new File(currentPhotoPath);
                 selectedImage.setImageURI(Uri.fromFile(f));
+                //if Picasso was implemented
+                //Picasso.with(this).load(mImageUri).into(mImageView);
 
                 Log.d("tag", "ABsolute Url of Image is " + Uri.fromFile(f));
 
