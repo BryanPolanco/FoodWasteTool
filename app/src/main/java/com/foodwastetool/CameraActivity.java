@@ -27,13 +27,25 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.auth.User;
+import com.google.firebase.ml.vision.FirebaseVision;
+import com.google.firebase.ml.vision.common.FirebaseVisionImage;
+import com.google.firebase.ml.vision.label.FirebaseVisionCloudImageLabelerOptions;
+import com.google.firebase.ml.vision.label.FirebaseVisionImageLabel;
+import com.google.firebase.ml.vision.label.FirebaseVisionImageLabeler;
+import com.google.firebase.ml.vision.label.FirebaseVisionOnDeviceImageLabelerOptions;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
@@ -45,8 +57,10 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.DatabaseMetaData;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CameraActivity extends AppCompatActivity {
@@ -55,6 +69,7 @@ public class CameraActivity extends AppCompatActivity {
     public static final int GALLERY_REQUEST_CODE = 5;
     public static final int PICK_IMAGE_REQUEST = 3;
     public static final String TAG = "TAG";
+    public int counter = 0;
     String currentPhotoPath;
     ImageView selectedImage;
     Button  cameraButton, galleryButton, uploadButton;
@@ -111,7 +126,76 @@ public class CameraActivity extends AppCompatActivity {
         return mime.getExtensionFromMimeType(cR.getType(uri));
     }
     private void uploadFile(){
+        final String[]  documentData = new String[3];
+
         if (mImageUri != null) {
+
+            FirebaseVisionImage image;
+            try {
+                image = FirebaseVisionImage.fromFilePath(CameraActivity.this,mImageUri );
+                FirebaseVisionCloudImageLabelerOptions options = new FirebaseVisionCloudImageLabelerOptions.Builder()
+                        .setConfidenceThreshold(0.9f)
+                        .build();
+                FirebaseVisionImageLabeler labeler = FirebaseVision.getInstance()
+                        .getCloudImageLabeler(options);
+                labeler.processImage(image)
+                        .addOnSuccessListener(new OnSuccessListener<List<FirebaseVisionImageLabel>>() {
+                            @Override
+                            public void onSuccess(List<FirebaseVisionImageLabel> labels) {
+                                for (FirebaseVisionImageLabel label: labels) {
+                                    String text = label.getText();
+                                    String entityId = label.getEntityId();
+                                    float confidence = label.getConfidence();
+                                    Log.d("tag", "the labels in the list are:"+ text +"," + entityId + "," + confidence);
+
+                                    DocumentReference foodRef = mFirestoreRef.collection("Food").document(text);
+                                    foodRef.get()
+                                            .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                                                @Override
+                                                public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                                                    if (task.isSuccessful()) {
+                                                        DocumentSnapshot document = task.getResult();
+                                                        if (document.exists()) {
+                                                            Log.d(TAG, "DocumentSnapshot data: " + document.getData());
+
+                                                            String name = document.getString("name");
+                                                            String calories = document.getString("calories");
+                                                            String serving = document.getString("serving");
+                                                            documentData[counter] = name;
+                                                            counter++;
+                                                            documentData[counter] = serving;
+                                                            counter++;
+                                                            documentData[counter] = calories;
+                                                            counter++;
+                                                            Log.d(TAG, "document data array:" + documentData);
+                                                            System.out.println(documentData[0]);
+
+
+                                                        } else {
+                                                            Log.d(TAG, "No such document");
+                                                        }
+                                                    } else {
+                                                        Log.d(TAG, "get failed with ", task.getException());
+                                                    }
+                                                }
+                                            });
+
+
+                                }
+                            }
+                        })
+                        .addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
+                                Log.d("tag", "Task failed with exception");
+                            }
+                        });
+
+            }catch(IOException e) {
+                e.printStackTrace();
+            }
+
+
             StorageReference fileReference = mStorageRef.child(System.currentTimeMillis() +"." + getFileExxtension(mImageUri));
             mUploadTask = fileReference.putFile(mImageUri)
                     .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
@@ -131,7 +215,38 @@ public class CameraActivity extends AppCompatActivity {
                             Uri downloadUrl = urlTask.getResult();
 
                             Upload upload = new Upload (downloadUrl.toString());
-                           mFirestoreRef.collection("Pictures").add(upload);
+
+                           if (documentData[0] == null){
+                               mFirestoreRef.collection("Pictures").add(upload);
+                           }else {
+                               mFirestoreRef.collection("Pictures").document(documentData[0]).set(upload);
+                               Map<String, Object> data = new HashMap<>();
+                               data.put("name", documentData[0]);
+                               data.put("serving", documentData[1]);
+                               data.put("calories", documentData[2]);
+
+                               DocumentReference nutritionRef = mFirestoreRef.collection("Pictures").document(documentData[0]);
+                               nutritionRef.update(data)
+                                       .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                           @Override
+                                           public void onSuccess(Void aVoid) {
+                                               Log.d(TAG, "DocumentSnapshot successfully updated!");
+                                           }
+                                       })
+                                       .addOnFailureListener(new OnFailureListener() {
+                                           @Override
+                                           public void onFailure(@NonNull Exception e) {
+                                               Log.w(TAG, "Error updating document", e);
+                                           }
+                                       });
+
+                           }
+
+
+
+
+
+
                         }
                     })
                     .addOnFailureListener(new OnFailureListener() {
